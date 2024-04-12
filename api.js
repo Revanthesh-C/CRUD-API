@@ -1,5 +1,4 @@
 
-const { text } = require('body-parser');
 const client = require('./connect.js')
 const express = require('express')
 const exp = express();
@@ -10,34 +9,24 @@ exp.listen(3300,()=>{
     console.log('Server is listening at port 3300')
 })
 
-client.connect()
+client.connect((err) => {
+  if (err){
+    console.log('Connection failure');
+  }
+  else
+  {
+  console.log('connection successful')
+  }
+})
 
-function client_side_display(id,err,status,errmsg,res_id)
-{
-      text = `{
-        "id": ${params.id},
-        "ver": "1.0",
-        "ts": ${Date.new()},
-        "params": {
-          "err": ${params.err},
-          "status": ${params.successful},
-          "errmsg": ${params.errmsg}
-        },
-        "responseCode": "OK",
-        "result": {
-          "id": ${params.res_id}
-        }
-      }`
 
-      return text;
-}
 
 exp.get('/v1/datasets/:id',(req,res)=>{
     client.query(`select * from datasets where id = '${req.params.id}'`,(err,result)=>{
         if(!err)
         {
               if(result.rows.length==0)
-              res.status(400).send('Enter proper route')
+              res.status(400).send('Entered ID not found')
               else 
               res.status(200).send(result.rows)
         }
@@ -76,38 +65,15 @@ exp.post('/v1/datasets',(req,res)=>{
 
   
     if(missingvals.length>0)
-        res.status(417).send(`${missingvals.join(",")} Insertion of these fields is compulsory`)
+        res.status(400).send(`${missingvals.join(",")} Insertion of these fields is compulsory`)
     else{
     const query = `INSERT INTO datasets (${keys.join(",")}) VALUES (${keys.map((key, index) => `$${index + 1}`).join(",")}) RETURNING *` 
 
     client.query(query, values,(err,result)=>{
         if(!err)
-        res.status(200).send({
-            "id": "api.dataset.create",
-            "ver": "1.0",
-            "ts": "2024-04-10T11:20:12ZZ",
-            "params": {
-              "err": null,
-              "status": "successful",
-              "errmsg": null
-            },
-            "responseCode": "OK",
-            "result": {
-              "id": idata.dataset_id
-            }
-          })
+        res.status(200).send({'inserted':`${idata.dataset_id}`})
         else
-        res.status(500).send({
-            "id": "api.dataset.create",
-            "ver": "1.0",
-            "ts": "2024-04-10T11:20:12ZZ",
-            "params": {
-              "err": 'true',
-              "status": "unsuccessful",
-              "errmsg": `${err.message}`
-            },
-            "responseCode": "OK",
-          })
+        res.status(500).send(err.message)
     })
     client.end;
   }
@@ -125,159 +91,58 @@ exp.put('/v1/datasets/:dataset_id', (req,res)=>{
                         {
                             if(result.rowCount==0)
                             {
-                              res.status(400).send({"id": "api.dataset.update",
-                                "ver": "1.0",
-                                "ts": "2024-04-10T11:20:12ZZ",
-                                "params": {
-                                  "err": 'true',
-                                  "status": "unsuccessful",
-                                  "errmsg": "Enter proper Route"
-                                },
-                                "responseCode": "OK"
-                              })
+                              res.status(400).send('Enter proper ID to update')
 
                             }
                             else
                             {
-                            res.status(200).send({"id": "api.dataset.update",
-                            "ver": "1.0",
-                            "ts": "2024-04-10T11:20:12ZZ",
-                            "params": {
-                              "err": null,
-                              "status": "successful",
-                              "errmsg": null
-                            },
-                            "responseCode": "OK",
-                            "result": {
-                              "id": `${req.params.id}`
-                            }})
-                          }
+                            res.status(200).send(`{updated:${req.params.dataset_id}}`)
+                            }
                         }
                         else
-                            res.status(500).send({
-                                "id": "api.dataset.update",
-                                "ver": "1.0",
-                                "ts": "2024-04-10T11:20:12ZZ",
-                                "params": {
-                                  "err": 'true',
-                                  "status": "unsuccessful",
-                                  "errmsg": `${err.message}`
-                                },
-                                "responseCode": "OK",
-                              })
+                            res.status(500).send(`${err.message}`)
                     })
     client.end;
 })
 
-exp.patch('/datasets/:dataset_id',async (req,res)=>{
-  const udata = req.body;
-  const keys = Object.keys(udata)
-  const value = Object.values(udata)
-  for(i=0;i<keys.length;i++)
-  {
-  const update = await client.query(`update datasets set ${keys[i]} = $1 where dataset_id = $2`,[`${value[i]}`,`${req.params.dataset_id}`],
-              (err,result) => {
-                  if(!err)
-                  {
-                    if(result.rowCount==0)
-                    res.status(400).send('No rows are updated')
-                  }
-                  else
-                  {
-                      res.send({
-                          "id": "api.dataset.update",
-                          "ver": "1.0",
-                          "ts": "2024-04-10T11:20:12ZZ",
-                          "params": {
-                            "err": 'true',
-                            "status": "unsuccessful",
-                            "errmsg": `${err.message}`
-                          },
-                          "responseCode": "OK",
-                        })
-                  }      
-              })
-              if(i==keys.length-1)
-              {
-                  res.send({"id": "api.dataset.update",
-                  "ver": "1.0",
-                  "ts": "2024-04-10T11:20:12ZZ",
-                  "params": {
-                    "err": null,
-                    "status": "successful",
-                    "errmsg": null
-                  },
-                  "responseCode": "OK",
-                  "result": {
-                    "id": udata.dataset_id
-                  }
-                  })
-                  client.end;
-              }
-              
-  }            
-})  
-  
-
-
-                   /* if(!err)
+exp.patch('/v1/datasets/:dataset_id',(req,res)=>{
+    const udata = req.body;
+    const keys = Object.keys(udata)
+    const value = Object.values(udata)
+    for(i=0;i<keys.length;i++)
+    {
+    const update = client.query(`update datasets set ${keys[i]} = $1 where dataset_id = $2`,[`${value[i]}`,`${req.params.dataset_id}`],
+                (err,result) => {
+                    if(!err)
                     {
-                        if(result.rowCount==0)
-                            {
-                              res.send({"id": "api.dataset.update",
-                                "ver": "1.0",
-                                "ts": "2024-04-10T11:20:12ZZ",
-                                "params": {
-                                  "err": 'true',
-                                  "status": "unsuccessful",
-                                  "errmsg": "Enter proper Route"
-                                },
-                                "result": {
-                              "id": `${req.params.id}`
-                              }})
-                            }
-                                            
-                        else
-                        {
-                        res.send({
-                            "id": "api.dataset.update",
-                            "ver": "1.0",
-                            "ts": "2024-04-10T11:20:12ZZ",
-                            "params": {
-                              "err": 'true',
-                              "status": "unsuccessful",
-                              "errmsg": `${err.message}`
-                            },
-                            "responseCode": "OK",
-                          })
-                       }      
-                }
+                      if(result.rowCount==0)
+                      res.status(400).send('Enter proper ID to be updated')
+                    }
+                    else
+                    {
+                        res.send(`${err.message}`)
+                    }      
+                })
                 if(i==keys.length-1)
                 {
-                    res.send({"id": "api.dataset.update",
-                    "ver": "1.0",
-                    "ts": "2024-04-10T11:20:12ZZ",
-                    "params": {
-                      "err": null,
-                      "status": "successful",
-                      "errmsg": null
-                    },
-                    "responseCode": "OK",
-                    "result": {
-                      "id": req.params.dataset_id
-                    }
-                    })
+                    res.send(`updated:${req.params.dataset_id}`)
                     client.end;
                 }
-              })*/    
+                
+    }            
+  })  
+      
 
-exp.delete('/datasets/:dataset_id',(req,res)=>{
-    client.query(`delete from datasets where dataset_id='${req.params.dataset_id}'`,(err,result)=>{
+exp.delete('/v1/datasets/:dataset_id',(req,res)=>{
+    client.query(`delete from datasets where dataset_id = '${req.params.dataset_id}'`,(err,result)=>{
         if(!err)
-        res.status(200).send('Deleted successfully')
+        { 
+          res.status(200).send('deleted successfully')
+        }
+        
         else
         {
-            res.send('page not found')
+          res.status(500).send(err.message)
         }
         })
     client.end;
